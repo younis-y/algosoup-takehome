@@ -5,7 +5,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { battery, db, dispatchPlan, planInterval } from "@/db";
 import { getPrices } from "@/lib/elexon";
-import { optimise, settle, validateBattery, type BatterySpec } from "@/lib/optimise";
+import { planWithFrequency, type DcBlock } from "@/lib/frequency";
+import { getDcPrices } from "@/lib/neso";
+import { settle, validateBattery, type BatterySpec } from "@/lib/optimise";
 import { expectedPeriods, previousDay } from "@/lib/periods";
 
 export type FormState = { error?: string } | undefined;
@@ -45,12 +47,27 @@ export async function generatePlan(_: FormState, f: FormData): Promise<FormState
     capacityMwh: b.capacityMwh, powerMw: b.powerMw, rte: b.rte,
     minSoc: b.minSoc, maxSoc: b.maxSoc, maxCyclesPerDay: b.maxCyclesPerDay,
   };
-  const plan = optimise(spec, Array.from({ length: n }, (_, i) => ({ period: i + 1, price: byPeriod.get(i + 1) ?? null })));
+  const slots = Array.from({ length: n }, (_, i) => ({ period: i + 1, price: byPeriod.get(i + 1) ?? null }));
+
+  // DC auction results for day D clear on D-1, so they're known at planning time. If NESO
+  // is unavailable we fall back to arbitrage only (no blocks to commit).
+  const dc = await getDcPrices(deliveryDate);
+  const blocks = new Map<string, DcBlock>();
+  for (const r of dc.rows) {
+    const k = blocks.get(r.deliveryStart) ?? { start: r.deliveryStart, end: r.deliveryEnd, dch: 0, dcl: 0 };
+    if (r.product === "DCH") k.dch = r.priceGbpMwH; else k.dcl = r.priceGbpMwH;
+    blocks.set(r.deliveryStart, k);
+  }
+  const plan = planWithFrequency(spec, deliveryDate, slots, [...blocks.values()]);
+  const pnlBreakdown = {
+    arbitrage: plan.arbitragePnl, frequency: plan.frequencyPnl, arbitrageOnly: plan.arbitrageOnlyPnl,
+    committed: plan.committed,
+  };
 
   // One transaction: upsert the plan (only over a draft) and replace its intervals.
   // If the existing plan is approved/executed, the upsert is a no-op, the id subquery
   // finds no draft, the NOT NULL plan_id fails and the whole batch rolls back.
-  const values = { batteryId, deliveryDate, forecastDate, params: spec, expectedPnl: plan.expectedPnl, status: "draft" as const };
+  const values = { batteryId, deliveryDate, forecastDate, params: spec, expectedPnl: plan.expectedPnl, pnlBreakdown, status: "draft" as const };
   const draftId = sql<number>`(select ${dispatchPlan.id} from ${dispatchPlan} where ${dispatchPlan.batteryId} = ${batteryId} and ${dispatchPlan.deliveryDate} = ${deliveryDate} and ${dispatchPlan.status} = 'draft')`;
   let planId: number;
   try {
@@ -64,7 +81,7 @@ export async function generatePlan(_: FormState, f: FormData): Promise<FormState
         .returning({ id: dispatchPlan.id }),
       db.delete(planInterval).where(eq(planInterval.planId, draftId)),
       db.insert(planInterval).values(plan.intervals.map((i) => ({
-        planId: draftId, period: i.period, action: i.action, mwh: i.mwh, socAfterMwh: i.socAfterMwh, forecastPrice: i.price,
+        planId: draftId, period: i.period, action: i.action, mwh: i.mwh, socAfterMwh: i.socAfterMwh, reservedMw: i.reservedMw, forecastPrice: i.price,
       }))),
     ]);
     planId = row.id;
@@ -102,10 +119,12 @@ export async function executePlan(_: FormState, f: FormData): Promise<FormState>
   const actualByPeriod = new Map(actual.rows.map((r) => [r.settlementPeriod, r.priceGbpMwh]));
   const realised = settle(intervals.map((i) => ({ ...i, price: i.forecastPrice })), actualByPeriod);
   if (realised === null) return { error: "Some traded periods have no actual price" };
+  // DC availability fees are fixed at auction, so they settle as planned.
+  const frequency = (plan.pnlBreakdown as { frequency?: number } | null)?.frequency ?? 0;
 
   // One transaction: flip status (only if still approved) and write actual prices together.
   const [flipped] = await db.batch([
-    db.update(dispatchPlan).set({ status: "executed", executedAt: new Date(), realisedPnl: realised })
+    db.update(dispatchPlan).set({ status: "executed", executedAt: new Date(), realisedPnl: realised + frequency })
       .where(and(eq(dispatchPlan.id, id), eq(dispatchPlan.status, "approved")))
       .returning({ id: dispatchPlan.id }),
     ...intervals.map((i) =>

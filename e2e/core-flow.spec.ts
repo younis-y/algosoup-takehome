@@ -80,6 +80,8 @@ test("create battery, generate, approve and execute a plan", async ({ page }) =>
   await expect(page).toHaveURL(/\/plans\/[^/]+$/);
   await expect(status).toHaveText("draft");
   await expect(page.getByText("Expected P&L").first()).toBeVisible();
+  // Seeded NESO prices for 2026-10-14 make Dynamic Containment worth committing.
+  await expect(page.getByTestId("pnl-mix")).toContainText("more than arbitrage alone");
   await expect(execute).toBeHidden();
 
   await approve.click();

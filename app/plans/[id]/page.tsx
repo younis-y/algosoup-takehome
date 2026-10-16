@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { gbp, londonToday } from "@/lib/format";
+import type { DcBlock } from "@/lib/frequency";
 import type { BatterySpec } from "@/lib/optimise";
 
 export default async function PlanPage({ params }: PageProps<"/plans/[id]">) {
@@ -29,6 +30,8 @@ export default async function PlanPage({ params }: PageProps<"/plans/[id]">) {
   const drawn = traded.reduce((a, i) => a + (i.action === "discharge" ? i.mwh / s : 0), 0);
   const cycles = drawn / ((spec.maxSoc - spec.minSoc) * spec.capacityMwh);
   const executed = plan.status === "executed";
+  const mix = plan.pnlBreakdown as { arbitrage: number; frequency: number; arbitrageOnly: number; committed: DcBlock[] } | null;
+  const ukTime = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { timeZone: "Europe/London", hour: "2-digit", minute: "2-digit" });
 
   return (
     <div className="grid gap-6">
@@ -49,8 +52,20 @@ export default async function PlanPage({ params }: PageProps<"/plans/[id]">) {
         </AlertDescription></Alert>
       )}
 
+      {mix && mix.committed.length > 0 && (
+        <Alert><AlertDescription>
+          Dynamic Containment committed for {mix.committed.map((k) => `${ukTime(k.start)}–${ukTime(k.end)}`).join(", ")} (UK time): full {spec.powerMw} MW held for DC High + Low, no wholesale trading in those blocks, SoC kept within 15 minutes of full-power delivery each way.
+        </AlertDescription></Alert>
+      )}
+
       <div className="grid gap-4 sm:grid-cols-3">
-        <Card><CardHeader><p className="text-sm text-muted-foreground">Expected P&amp;L</p><CardTitle className="font-mono text-2xl">{gbp(plan.expectedPnl)}</CardTitle></CardHeader></Card>
+        <Card><CardHeader><p className="text-sm text-muted-foreground">Expected P&amp;L</p><CardTitle className="font-mono text-2xl">{gbp(plan.expectedPnl)}</CardTitle>
+          {mix && mix.frequency > 0 && (
+            <p className="text-xs text-muted-foreground" data-testid="pnl-mix">
+              Wholesale {gbp(mix.arbitrage)} + DC {gbp(mix.frequency)} · {gbp(plan.expectedPnl - mix.arbitrageOnly)} more than arbitrage alone
+            </p>
+          )}
+        </CardHeader></Card>
         <Card><CardHeader><p className="text-sm text-muted-foreground">Realised P&amp;L</p><CardTitle className="font-mono text-2xl">{executed ? gbp(plan.realisedPnl) : "Not yet settled"}</CardTitle></CardHeader></Card>
         <Card><CardHeader><p className="text-sm text-muted-foreground">Forecast error</p><CardTitle className="font-mono text-2xl">{executed ? gbp((plan.realisedPnl ?? 0) - plan.expectedPnl) : "—"}</CardTitle></CardHeader></Card>
       </div>
@@ -59,7 +74,7 @@ export default async function PlanPage({ params }: PageProps<"/plans/[id]">) {
         <CardHeader className="flex flex-row items-start justify-between gap-4">
           <div>
             <CardTitle>Dispatch schedule</CardTitle>
-            <p className="text-sm text-muted-foreground">Top: price. Bottom: energy bought (below zero) and sold (above), with state of charge.</p>
+            <p className="text-sm text-muted-foreground">Top: price. Bottom: energy bought (below zero) and sold (above), with state of charge. Shaded: held for Dynamic Containment.</p>
           </div>
           {/* Actual prices are complete only after the UK trading day ends. */}
           <PlanActions planId={plan.id} status={plan.status} settlesAfter={plan.deliveryDate >= londonToday() ? plan.deliveryDate : null} />
@@ -67,7 +82,7 @@ export default async function PlanPage({ params }: PageProps<"/plans/[id]">) {
         <CardContent>
           <DispatchChart showActual={executed} rows={intervals.map((i) => ({
             period: i.period, forecastPrice: i.forecastPrice, actualPrice: i.actualPrice,
-            charge: i.action === "charge" ? i.mwh : 0, discharge: i.action === "discharge" ? i.mwh : 0, soc: i.socAfterMwh,
+            charge: i.action === "charge" ? i.mwh : 0, discharge: i.action === "discharge" ? i.mwh : 0, soc: i.socAfterMwh, reserved: i.action === "reserve",
           }))} />
         </CardContent>
       </Card>
