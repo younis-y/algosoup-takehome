@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { battery, db, dispatchPlan, planInterval } from "@/db";
@@ -47,25 +47,36 @@ export async function generatePlan(_: FormState, f: FormData): Promise<FormState
   };
   const plan = optimise(spec, Array.from({ length: n }, (_, i) => ({ period: i + 1, price: byPeriod.get(i + 1) ?? null })));
 
-  // Upsert only over a draft: approved/executed plans are immutable.
+  // One transaction: upsert the plan (only over a draft) and replace its intervals.
+  // If the existing plan is approved/executed, the upsert is a no-op, the id subquery
+  // finds no draft, the NOT NULL plan_id fails and the whole batch rolls back.
   const values = { batteryId, deliveryDate, forecastDate, params: spec, expectedPnl: plan.expectedPnl, status: "draft" as const };
-  const [row] = await db.insert(dispatchPlan).values(values)
-    .onConflictDoUpdate({
-      target: [dispatchPlan.batteryId, dispatchPlan.deliveryDate],
-      set: { ...values, createdAt: new Date(), realisedPnl: null },
-      setWhere: eq(dispatchPlan.status, "draft"),
-    })
-    .returning({ id: dispatchPlan.id });
-  if (!row) return { error: `A plan for ${deliveryDate} is already approved and can't be regenerated` };
-
-  await db.batch([
-    db.delete(planInterval).where(eq(planInterval.planId, row.id)),
-    db.insert(planInterval).values(plan.intervals.map((i) => ({
-      planId: row.id, period: i.period, action: i.action, mwh: i.mwh, socAfterMwh: i.socAfterMwh, forecastPrice: i.price,
-    }))),
-  ]);
+  const draftId = sql<number>`(select ${dispatchPlan.id} from ${dispatchPlan} where ${dispatchPlan.batteryId} = ${batteryId} and ${dispatchPlan.deliveryDate} = ${deliveryDate} and ${dispatchPlan.status} = 'draft')`;
+  let planId: number;
+  try {
+    const [[row]] = await db.batch([
+      db.insert(dispatchPlan).values(values)
+        .onConflictDoUpdate({
+          target: [dispatchPlan.batteryId, dispatchPlan.deliveryDate],
+          set: { ...values, createdAt: new Date(), realisedPnl: null },
+          setWhere: eq(dispatchPlan.status, "draft"),
+        })
+        .returning({ id: dispatchPlan.id }),
+      db.delete(planInterval).where(eq(planInterval.planId, draftId)),
+      db.insert(planInterval).values(plan.intervals.map((i) => ({
+        planId: draftId, period: i.period, action: i.action, mwh: i.mwh, socAfterMwh: i.socAfterMwh, forecastPrice: i.price,
+      }))),
+    ]);
+    planId = row.id;
+  } catch (e) {
+    const existing = await db.query.dispatchPlan.findFirst({
+      where: and(eq(dispatchPlan.batteryId, batteryId), eq(dispatchPlan.deliveryDate, deliveryDate)),
+    });
+    if (existing && existing.status !== "draft") return { error: `A plan for ${deliveryDate} is already ${existing.status} and can't be regenerated` };
+    throw e;
+  }
   revalidatePath(`/batteries/${batteryId}`);
-  redirect(`/plans/${row.id}`);
+  redirect(`/plans/${planId}`);
 }
 
 export async function approvePlan(_: FormState, f: FormData): Promise<FormState> {
@@ -92,12 +103,15 @@ export async function executePlan(_: FormState, f: FormData): Promise<FormState>
   const realised = settle(intervals.map((i) => ({ ...i, price: i.forecastPrice })), actualByPeriod);
   if (realised === null) return { error: "Some traded periods have no actual price" };
 
-  const [row] = await db.update(dispatchPlan).set({ status: "executed", executedAt: new Date(), realisedPnl: realised })
-    .where(and(eq(dispatchPlan.id, id), eq(dispatchPlan.status, "approved")))
-    .returning({ id: dispatchPlan.id });
-  if (!row) return { error: "Plan was changed by someone else; reload" };
-  await db.batch(intervals.map((i) =>
-    db.update(planInterval).set({ actualPrice: actualByPeriod.get(i.period) ?? null })
-      .where(and(eq(planInterval.planId, id), eq(planInterval.period, i.period)))) as [never, ...never[]]);
+  // One transaction: flip status (only if still approved) and write actual prices together.
+  const [flipped] = await db.batch([
+    db.update(dispatchPlan).set({ status: "executed", executedAt: new Date(), realisedPnl: realised })
+      .where(and(eq(dispatchPlan.id, id), eq(dispatchPlan.status, "approved")))
+      .returning({ id: dispatchPlan.id }),
+    ...intervals.map((i) =>
+      db.update(planInterval).set({ actualPrice: actualByPeriod.get(i.period) ?? null })
+        .where(and(eq(planInterval.planId, id), eq(planInterval.period, i.period)))),
+  ]);
+  if (flipped.length === 0) return { error: "Plan was changed by someone else; reload" };
   revalidatePath(`/plans/${id}`);
 }
