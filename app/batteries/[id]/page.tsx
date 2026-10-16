@@ -26,7 +26,7 @@ export default async function BatteryPage({ params }: PageProps<"/batteries/[id]
       <div>
         <Link href="/" className="text-sm text-muted-foreground hover:underline">← Batteries</Link>
         <h1 className="text-2xl font-semibold">{b.name}</h1>
-        <p className="font-mono text-sm text-muted-foreground">
+        <p className="tabular-nums text-sm text-muted-foreground">
           {b.capacityMwh} MWh · {b.powerMw} MW · RTE {Math.round(b.rte * 100)}% · SoC {Math.round(b.minSoc * 100)}–{Math.round(b.maxSoc * 100)}% · ≤{b.maxCyclesPerDay} cycles/day
         </p>
       </div>
@@ -54,9 +54,9 @@ export default async function BatteryPage({ params }: PageProps<"/batteries/[id]
               {plans.map((p) => (
                 <TableRow key={p.id}>
                   <TableCell><Link className="font-medium hover:underline" href={`/plans/${p.id}`}>{p.deliveryDate}</Link></TableCell>
-                  <TableCell><Badge variant={p.status === "draft" ? "outline" : p.status === "approved" ? "secondary" : "default"}>{p.status}</Badge></TableCell>
-                  <TableCell className="text-right font-mono">{gbp(p.expectedPnl)}</TableCell>
-                  <TableCell className="text-right font-mono">{gbp(p.realisedPnl)}</TableCell>
+                  <TableCell><Badge variant={p.status}>{p.status}</Badge></TableCell>
+                  <TableCell className="text-right tabular-nums">{gbp(p.expectedPnl)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{gbp(p.realisedPnl)}</TableCell>
                 </TableRow>
               ))}
               {plans.length === 0 && <TableRow><TableCell colSpan={4} className="text-muted-foreground">No plans yet.</TableCell></TableRow>}

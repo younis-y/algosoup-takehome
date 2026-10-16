@@ -13,13 +13,13 @@ type Battery = {
 async function fillBattery(page: Page, b: Battery) {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Batteries" })).toBeVisible();
-  await page.getByLabel("Name").fill(b.name);
-  await page.getByLabel("Energy capacity (MWh)").fill(b.capacity);
-  await page.getByLabel("Power (MW)").fill(b.power);
-  await page.getByLabel("Round-trip efficiency (%)").fill(b.efficiency);
-  await page.getByLabel("Min SoC (%)").fill(b.minSoc);
-  await page.getByLabel("Max SoC (%)").fill(b.maxSoc);
-  await page.getByLabel("Max cycles per day").fill(b.cycles);
+  await page.getByLabel("What's it called?", { exact: true }).fill(b.name);
+  await page.getByLabel("How much energy can it store?", { exact: true }).fill(b.capacity);
+  await page.getByLabel("How fast can it charge or discharge?", { exact: true }).fill(b.power);
+  await page.getByLabel("How much comes back after a round trip?", { exact: true }).fill(b.efficiency);
+  await page.getByLabel("Minimum charge (%)", { exact: true }).fill(b.minSoc);
+  await page.getByLabel("Maximum charge (%)", { exact: true }).fill(b.maxSoc);
+  await page.getByLabel("Cycles allowed per day", { exact: true }).fill(b.cycles);
   await page.getByRole("button", { name: "Add battery" }).click();
 }
 
@@ -33,6 +33,7 @@ const valid: Omit<Battery, "name"> = {
 };
 
 // Strip the client-side guards, as a stale tab or hand-made request would, to hit the server check.
+// Every <input> is covered, including both halves of the "Keep its charge between" range field.
 async function forceSubmit(page: Page, button: string) {
   await page.evaluate((name) => {
     document.querySelectorAll("input").forEach((i) => { i.removeAttribute("min"); i.removeAttribute("max"); });
@@ -43,8 +44,8 @@ async function forceSubmit(page: Page, button: string) {
 
 test("prevents, then rejects, a battery with impossible efficiency", async ({ page }) => {
   await page.goto("/");
-  await page.getByLabel("Name").fill(`E2E bad ${Date.now()}`);
-  await page.getByLabel("Round-trip efficiency (%)").fill("120");
+  await page.getByLabel("What's it called?", { exact: true }).fill(`E2E bad ${Date.now()}`);
+  await page.getByLabel("How much comes back after a round trip?", { exact: true }).fill("120");
   // Prevent: the reason is shown and the action is unavailable.
   await expect(page.getByTestId("battery-problems")).toContainText(/efficiency/i);
   await expect(page.getByRole("button", { name: "Add battery" })).toBeDisabled();
@@ -56,9 +57,11 @@ test("prevents, then rejects, a battery with impossible efficiency", async ({ pa
 
 test("max SoC cannot be set below min SoC", async ({ page }) => {
   await page.goto("/");
-  await page.getByLabel("Min SoC (%)").fill("60");
-  await expect(page.getByLabel("Max SoC (%)")).toHaveAttribute("min", "61");
-  await page.getByLabel("Max SoC (%)").fill("40");
+  // Min and max SoC share one range field but stay separate inputs.
+  await expect(page.getByRole("group", { name: "Keep its charge between" })).toBeVisible();
+  await page.getByLabel("Minimum charge (%)", { exact: true }).fill("60");
+  await expect(page.getByLabel("Maximum charge (%)", { exact: true })).toHaveAttribute("min", "61");
+  await page.getByLabel("Maximum charge (%)", { exact: true }).fill("40");
   await expect(page.getByTestId("battery-problems")).toContainText("Min SoC must be below max SoC");
   await expect(page.getByRole("button", { name: "Add battery" })).toBeDisabled();
 });
@@ -70,7 +73,7 @@ test("create battery, generate, approve and execute a plan", async ({ page }) =>
   await expect(page).toHaveURL(/\/batteries\/[^/]+$/);
   await expect(page.getByRole("heading", { level: 1, name })).toBeVisible();
 
-  await page.getByLabel("Delivery date").fill("2026-10-14");
+  await page.getByLabel("Which day are you planning?", { exact: true }).fill("2026-10-14");
   await page.getByRole("button", { name: "Generate plan" }).click();
 
   const status = page.getByTestId("plan-status");

@@ -28,11 +28,11 @@ export default async function Home() {
               {batteries.map((b) => (
                 <TableRow key={b.id}>
                   <TableCell><Link className="font-medium underline-offset-4 hover:underline" href={`/batteries/${b.id}`}>{b.name}</Link></TableCell>
-                  <TableCell className="text-right font-mono">{b.capacityMwh}</TableCell>
-                  <TableCell className="text-right font-mono">{b.powerMw}</TableCell>
-                  <TableCell className="text-right font-mono">{Math.round(b.rte * 100)}%</TableCell>
-                  <TableCell className="text-right font-mono">{Math.round(b.minSoc * 100)}–{Math.round(b.maxSoc * 100)}%</TableCell>
-                  <TableCell className="text-right font-mono">{b.maxCyclesPerDay}</TableCell>
+                  <TableCell className="text-right tabular-nums">{b.capacityMwh}</TableCell>
+                  <TableCell className="text-right tabular-nums">{b.powerMw}</TableCell>
+                  <TableCell className="text-right tabular-nums">{Math.round(b.rte * 100)}%</TableCell>
+                  <TableCell className="text-right tabular-nums">{Math.round(b.minSoc * 100)}–{Math.round(b.maxSoc * 100)}%</TableCell>
+                  <TableCell className="text-right tabular-nums">{b.maxCyclesPerDay}</TableCell>
                 </TableRow>
               ))}
               {batteries.length === 0 && (

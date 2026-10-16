@@ -6,23 +6,44 @@
 
 import Link from "next/link";
 import { useActionState, useState } from "react";
+import { cn } from "cn";
 import { approvePlan, createBattery, executePlan, generatePlan, type FormState } from "@/app/actions";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { validateBattery } from "@/lib/optimise";
 
 function ErrorAlert({ state }: { state: FormState }) {
   if (!state?.error) return null;
-  return <Alert variant="destructive" role="alert"><AlertDescription>{state.error}</AlertDescription></Alert>;
+  return (
+    <Alert variant="destructive" role="alert" className="rounded-2xl border-0 bg-destructive/10 px-4 py-3">
+      <AlertDescription>{state.error}</AlertDescription>
+    </Alert>
+  );
 }
 
-function Field({ id, label, ...props }: { id: string; label: string } & React.ComponentProps<typeof Input>) {
+// Filled, borderless box: the label sits inside at the top-left, the value below it,
+// and the unit (if any) inside on the right.
+const box = "relative h-14 rounded-2xl bg-muted/60";
+const floatingLabel = "absolute top-2 left-4 right-4 truncate text-xs leading-4 text-muted-foreground";
+const unitText = "pointer-events-none absolute right-4 bottom-2 text-sm leading-6 text-muted-foreground";
+const noSpinner = "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none";
+const filledInput = cn(
+  "h-14 rounded-2xl border-0 bg-muted/60 px-4 pt-6 pb-2 text-base leading-6 tabular-nums shadow-none md:text-base",
+  "dark:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring/50",
+);
+
+function Field({ id, label, unit, className, ...props }: { id: string; label: string; unit?: string } & React.ComponentProps<typeof Input>) {
   return (
-    <div className="grid gap-1.5">
-      <Label htmlFor={id}>{label}</Label>
-      <Input id={id} name={id} required {...props} />
+    <div className="relative">
+      <label htmlFor={id} className={cn(floatingLabel, "pointer-events-none")}>{label}</label>
+      <Input
+        id={id} name={id} required
+        aria-describedby={unit ? `${id}-unit` : undefined}
+        className={cn(filledInput, props.type === "number" && noSpinner, unit && "pr-16", className)}
+        {...props}
+      />
+      {unit && <span id={`${id}-unit`} className={unitText}>{unit}</span>}
     </div>
   );
 }
@@ -41,32 +62,49 @@ export function BatteryForm() {
   const problems = validateBattery(spec); // same rules the server applies
   const usable = (spec.maxSoc - spec.minSoc) * spec.capacityMwh;
   const bind = (k: keyof typeof initial) => ({ value: v[k], onChange: (e: React.ChangeEvent<HTMLInputElement>) => setV({ ...v, [k]: e.target.value }) });
+  const num = { type: "number", step: "any", inputMode: "decimal" } as const;
+  const rangeInput = cn("w-14 min-w-0 bg-transparent p-0 text-base leading-6 tabular-nums outline-none", noSpinner);
 
   return (
-    <form action={action} className="grid gap-4">
-      <Field id="name" label="Name" placeholder="e.g. Cottam BESS" value={name} onChange={(e) => setName(e.target.value)} />
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-        <Field id="capacityMwh" label="Energy capacity (MWh)" type="number" step="any" min={0.1} {...bind("capacityMwh")} />
-        <Field id="powerMw" label="Power (MW)" type="number" step="any" min={0.1} {...bind("powerMw")} />
-        <Field id="rte" label="Round-trip efficiency (%)" type="number" step="any" min={1} max={100} {...bind("rte")} />
-        <Field id="minSoc" label="Min SoC (%)" type="number" step="any" min={0} max={Number.isFinite(n("maxSoc")) ? n("maxSoc") - 1 : 99} {...bind("minSoc")} />
-        {/* Like a return date that can't precede the outbound date: max SoC starts above min SoC. */}
-        <Field id="maxSoc" label="Max SoC (%)" type="number" step="any" min={(n("minSoc") || 0) + 1} max={100} {...bind("maxSoc")} />
-        <Field id="maxCyclesPerDay" label="Max cycles per day" type="number" step="any" min={0.1} {...bind("maxCyclesPerDay")} />
+    <form action={action} className="grid gap-3">
+      <Field id="name" label="What's it called?" placeholder="e.g. Cottam BESS" value={name} onChange={(e) => setName(e.target.value)} />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field id="capacityMwh" label="How much energy can it store?" unit="MWh" {...num} min={0.1} {...bind("capacityMwh")} />
+        <Field id="powerMw" label="How fast can it charge or discharge?" unit="MW" {...num} min={0.1} {...bind("powerMw")} />
+        <Field id="rte" label="How much comes back after a round trip?" unit="%" {...num} min={1} max={100} {...bind("rte")} />
+        <Field id="maxCyclesPerDay" label="Cycles allowed per day" unit="/ day" {...num} min={0.1} {...bind("maxCyclesPerDay")} />
+        {/* One box, two inputs: still posts minSoc and maxSoc separately. */}
+        <div role="group" aria-labelledby="socRange-label" className={cn(box, "px-4 pt-6 pb-2 focus-within:ring-2 focus-within:ring-ring/50 sm:col-span-2")}>
+          <label id="socRange-label" htmlFor="minSoc" className={floatingLabel}>Keep its charge between</label>
+          <div className="flex items-center gap-2">
+            <input id="minSoc" name="minSoc" required aria-label="Minimum charge (%)" className={rangeInput}
+              {...num} min={0} max={Number.isFinite(n("maxSoc")) ? n("maxSoc") - 1 : 99} {...bind("minSoc")} />
+            <span aria-hidden="true" className="text-muted-foreground">–</span>
+            {/* Like a return date that can't precede the outbound date: max SoC starts above min SoC. */}
+            <input id="maxSoc" name="maxSoc" required aria-label="Maximum charge (%)" className={rangeInput}
+              {...num} min={(n("minSoc") || 0) + 1} max={100} {...bind("maxSoc")} />
+          </div>
+          <span aria-hidden="true" className={unitText}>%</span>
+        </div>
       </div>
       {problems.length > 0 ? (
-        <ul className="list-disc pl-5 text-sm text-destructive" data-testid="battery-problems">
+        <ul className="grid list-disc gap-1 rounded-2xl bg-destructive/10 py-3 pr-4 pl-9 text-sm text-destructive" data-testid="battery-problems">
           {problems.map((p) => <li key={p}>{p}</li>)}
         </ul>
       ) : (
-        <p className="text-sm text-muted-foreground">
+        <p className="px-1 text-sm text-muted-foreground">
           Usable energy {usable.toFixed(1)} MWh · {(usable / spec.powerMw).toFixed(1)} h at full power · 1 cycle = {usable.toFixed(1)} MWh discharged
         </p>
       )}
       <ErrorAlert state={state} />
-      <Button type="submit" disabled={pending || problems.length > 0 || !name.trim()} className="justify-self-start">
-        {pending ? "Adding…" : "Add battery"}
-      </Button>
+      <div className="flex flex-wrap items-center gap-3">
+        <Button type="submit" disabled={pending || problems.length > 0 || !name.trim()} className="h-12 px-6">
+          {pending ? "Adding…" : "Add battery"}
+        </Button>
+        {problems.length === 0 && !name.trim() && (
+          <p className="text-sm text-muted-foreground">Give it a name to add it.</p>
+        )}
+      </div>
     </form>
   );
 }
@@ -86,20 +124,19 @@ export function PlanForm({ batteryId, defaultDate, maxDate, existing }: {
     <form action={action} className="grid gap-3">
       <input type="hidden" name="batteryId" value={batteryId} />
       <div className="flex flex-wrap items-end gap-3">
-        <div className="grid gap-1.5">
-          <Label htmlFor="deliveryDate">Delivery date</Label>
-          <Input id="deliveryDate" name="deliveryDate" type="date" value={date} max={maxDate} required onChange={(e) => setDate(e.target.value)} />
+        <div className="min-w-56 flex-1 sm:max-w-xs">
+          <Field id="deliveryDate" label="Which day are you planning?" type="date" value={date} max={maxDate} onChange={(e) => setDate(e.target.value)} />
         </div>
-        <Button type="submit" disabled={pending || !date || locked || future}>
+        <Button type="submit" disabled={pending || !date || locked || future} className="h-14 px-6">
           {pending ? "Optimising…" : plan?.status === "draft" ? "Regenerate draft" : "Generate plan"}
         </Button>
       </div>
       {locked && (
-        <p className="text-sm text-muted-foreground" data-testid="plan-locked">
+        <p className="px-1 text-sm text-muted-foreground" data-testid="plan-locked">
           The plan for {date} is already {plan.status} and can&apos;t be regenerated. <Link className="underline" href={`/plans/${plan.id}`}>View it</Link>
         </p>
       )}
-      {future && <p className="text-sm text-muted-foreground">Plans can be made up to today ({maxDate}); the forecast needs yesterday&apos;s prices.</p>}
+      {future && <p className="px-1 text-sm text-muted-foreground">Plans can be made up to today ({maxDate}); the forecast needs yesterday&apos;s prices.</p>}
       <ErrorAlert state={state} />
     </form>
   );
@@ -113,13 +150,13 @@ export function PlanActions({ planId, status, settlesAfter }: { planId: number; 
       {status === "draft" && (
         <form action={approve}>
           <input type="hidden" name="planId" value={planId} />
-          <Button type="submit" disabled={approving}>{approving ? "Approving…" : "Approve plan"}</Button>
+          <Button type="submit" disabled={approving} className="h-12 px-6">{approving ? "Approving…" : "Approve plan"}</Button>
         </form>
       )}
       {status === "approved" && (
         <form action={execute}>
           <input type="hidden" name="planId" value={planId} />
-          <Button type="submit" disabled={executing || !!settlesAfter}>{executing ? "Settling…" : "Mark executed"}</Button>
+          <Button type="submit" disabled={executing || !!settlesAfter} className="h-12 px-6">{executing ? "Settling…" : "Mark executed"}</Button>
         </form>
       )}
       {status === "approved" && settlesAfter && (

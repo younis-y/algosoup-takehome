@@ -18,6 +18,12 @@ const badgeVariants = cva(
         ghost:
           "hover:bg-muted hover:text-muted-foreground dark:hover:bg-muted/50",
         link: "text-primary underline-offset-4 hover:underline",
+        // Plan status pills: soft tint, the word always shown.
+        draft: "bg-muted text-foreground",
+        approved:
+          "bg-blue-500/12 text-blue-700 dark:bg-blue-400/15 dark:text-blue-300",
+        executed:
+          "bg-emerald-500/12 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-300",
       },
     },
     defaultVariants: {

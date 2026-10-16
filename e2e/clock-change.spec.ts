@@ -13,13 +13,13 @@ type Battery = {
 async function fillBattery(page: Page, b: Battery) {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Batteries" })).toBeVisible();
-  await page.getByLabel("Name").fill(b.name);
-  await page.getByLabel("Energy capacity (MWh)").fill(b.capacity);
-  await page.getByLabel("Power (MW)").fill(b.power);
-  await page.getByLabel("Round-trip efficiency (%)").fill(b.efficiency);
-  await page.getByLabel("Min SoC (%)").fill(b.minSoc);
-  await page.getByLabel("Max SoC (%)").fill(b.maxSoc);
-  await page.getByLabel("Max cycles per day").fill(b.cycles);
+  await page.getByLabel("What's it called?", { exact: true }).fill(b.name);
+  await page.getByLabel("How much energy can it store?", { exact: true }).fill(b.capacity);
+  await page.getByLabel("How fast can it charge or discharge?", { exact: true }).fill(b.power);
+  await page.getByLabel("How much comes back after a round trip?", { exact: true }).fill(b.efficiency);
+  await page.getByLabel("Minimum charge (%)", { exact: true }).fill(b.minSoc);
+  await page.getByLabel("Maximum charge (%)", { exact: true }).fill(b.maxSoc);
+  await page.getByLabel("Cycles allowed per day", { exact: true }).fill(b.cycles);
   await page.getByRole("button", { name: "Add battery" }).click();
 }
 
@@ -36,7 +36,7 @@ async function generatePlan(page: Page, deliveryDate: string) {
   await fillBattery(page, { ...valid, name: `E2E clock ${Date.now()}` });
   await expect(page).toHaveURL(/\/batteries\/[^/]+$/);
 
-  await page.getByLabel("Delivery date").fill(deliveryDate);
+  await page.getByLabel("Which day are you planning?", { exact: true }).fill(deliveryDate);
   await page.getByRole("button", { name: "Generate plan" }).click();
 
   // First request for a date fetches prices live from Elexon, so allow extra time.

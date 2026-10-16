@@ -13,13 +13,13 @@ type Battery = {
 async function fillBattery(page: Page, b: Battery) {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Batteries" })).toBeVisible();
-  await page.getByLabel("Name").fill(b.name);
-  await page.getByLabel("Energy capacity (MWh)").fill(b.capacity);
-  await page.getByLabel("Power (MW)").fill(b.power);
-  await page.getByLabel("Round-trip efficiency (%)").fill(b.efficiency);
-  await page.getByLabel("Min SoC (%)").fill(b.minSoc);
-  await page.getByLabel("Max SoC (%)").fill(b.maxSoc);
-  await page.getByLabel("Max cycles per day").fill(b.cycles);
+  await page.getByLabel("What's it called?", { exact: true }).fill(b.name);
+  await page.getByLabel("How much energy can it store?", { exact: true }).fill(b.capacity);
+  await page.getByLabel("How fast can it charge or discharge?", { exact: true }).fill(b.power);
+  await page.getByLabel("How much comes back after a round trip?", { exact: true }).fill(b.efficiency);
+  await page.getByLabel("Minimum charge (%)", { exact: true }).fill(b.minSoc);
+  await page.getByLabel("Maximum charge (%)", { exact: true }).fill(b.maxSoc);
+  await page.getByLabel("Cycles allowed per day", { exact: true }).fill(b.cycles);
   await page.getByRole("button", { name: "Add battery" }).click();
 }
 
@@ -41,7 +41,7 @@ test("an approved plan cannot be overwritten by regenerating the same date", asy
   await expect(page.getByRole("heading", { level: 1, name })).toBeVisible();
   const batteryUrl = page.url();
 
-  await page.getByLabel("Delivery date").fill(DATE);
+  await page.getByLabel("Which day are you planning?", { exact: true }).fill(DATE);
   await page.getByRole("button", { name: "Generate plan" }).click();
 
   const status = page.getByTestId("plan-status");
@@ -55,7 +55,7 @@ test("an approved plan cannot be overwritten by regenerating the same date", asy
   // Try to regenerate the same date from the battery page.
   await page.goto(batteryUrl);
   await expect(page.getByRole("heading", { level: 1, name })).toBeVisible();
-  await page.getByLabel("Delivery date").fill(DATE);
+  await page.getByLabel("Which day are you planning?", { exact: true }).fill(DATE);
   // Prevent: the UI explains and disables regeneration for an approved date.
   await expect(page.getByTestId("plan-locked")).toContainText("already approved");
   const generate = page.getByRole("button", { name: "Generate plan" });
