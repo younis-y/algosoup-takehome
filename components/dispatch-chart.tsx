@@ -34,8 +34,8 @@ export function DispatchChart({ rows, showActual }: { rows: ChartRow[]; showActu
           <YAxis {...axis} width={48} tickFormatter={(v) => `£${v}`} />
           <ReferenceLine y={0} stroke="var(--muted-foreground)" strokeOpacity={0.6} />
           <ChartTooltip content={<ChartTooltipContent labelFormatter={(_, p) => `Period ${p?.[0]?.payload.period}`} />} />
-          <Line dataKey="forecastPrice" type="stepAfter" stroke="var(--color-forecastPrice)" strokeWidth={2} dot={false} connectNulls={false} />
-          {showActual && <Line dataKey="actualPrice" type="stepAfter" stroke="var(--color-actualPrice)" strokeWidth={2} strokeDasharray="4 3" dot={false} />}
+          <Line dataKey="forecastPrice" type="stepAfter" stroke="var(--color-forecastPrice)" strokeWidth={2} dot={false} connectNulls={false} isAnimationActive={false} />
+          {showActual && <Line dataKey="actualPrice" type="stepAfter" stroke="var(--color-actualPrice)" strokeWidth={2} strokeDasharray="4 3" dot={false} isAnimationActive={false} />}
           {showActual && <ChartLegend content={<ChartLegendContent />} />}
         </ComposedChart>
       </ChartContainer>
@@ -46,9 +46,9 @@ export function DispatchChart({ rows, showActual }: { rows: ChartRow[]; showActu
           <YAxis {...axis} width={48} />
           <ReferenceLine y={0} stroke="var(--muted-foreground)" strokeOpacity={0.6} />
           <ChartTooltip content={<ChartTooltipContent labelFormatter={(_, p) => `Period ${p?.[0]?.payload.period}`} />} />
-          <Bar dataKey="charge" fill="var(--color-charge)" radius={[0, 0, 4, 4]} />
-          <Bar dataKey="discharge" fill="var(--color-discharge)" radius={[4, 4, 0, 0]} />
-          <Line dataKey="soc" type="monotone" stroke="var(--color-soc)" strokeWidth={2} dot={false} />
+          <Bar dataKey="charge" fill="var(--color-charge)" radius={[0, 0, 4, 4]} isAnimationActive={false} />
+          <Bar dataKey="discharge" fill="var(--color-discharge)" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+          <Line dataKey="soc" type="linear" stroke="var(--color-soc)" strokeWidth={2} dot={false} isAnimationActive={false} />
           <ChartLegend content={<ChartLegendContent />} />
         </ComposedChart>
       </ChartContainer>
