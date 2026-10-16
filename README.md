@@ -83,6 +83,10 @@ Prices and P&L use `double precision` rather than `numeric`. Dates use Drizzle's
 - DC availability fees settle as planned. Realised P&L = wholesale volumes at actual prices + DC fees.
 - Limits: the arbitrage optimiser doesn't deliberately charge up to make DC feasible, so DC is committed only where the arbitrage plan leaves SoC inside the band. A block that covers period 1 is never feasible, because the day starts at min SoC. Energy delivered under DC and availability penalties are not modelled.
 
+## Plain language
+
+The interface is written for someone with no energy background. It uses everyday wording ("buy", "sell", "half-hours", stages Draft → Approved → Done), shows clock times instead of settlement-period numbers, and compares each battery to how many homes it could power for a day. Every abbreviation (MWh, MW, £/MWh, P&L, DC, EFA, NESO) has a hover definition and appears in a "Words we use" glossary on each page (`components/glossary.tsx`). Three example batteries with plain names are seeded.
+
 ## Prevent, then enforce
 
 The UI only offers valid choices, and the server re-checks everything as the backstop:
@@ -142,7 +146,7 @@ npm run test:e2e   # Playwright (WebKit)
 
 - **Joint optimisation of DC and arbitrage:** charge up on purpose to make DC blocks feasible, and add Dynamic Moderation/Regulation and partial MW offers.
 - **Editing batteries:** plans already store a snapshot of the settings, so editing a battery would not change past plans.
-- **LP/MILP optimiser:** report the uplift over greedy, with a binary variable to prevent simultaneous charge and discharge.
+- **LP optimiser:** built and tested on the [`lp-optimiser`](https://github.com/younis-y/algosoup-takehome/tree/lp-optimiser) branch (never worse than greedy; +£7 to +£63 on real October prices), not yet merged or deployed.
 - **A better forecast** than D‑1 persistence.
 - **Balancing Mechanism:** needs a bid/offer strategy and acceptance modelling. It can't be planned like a fixed schedule.
 - **Auth and multi-tenancy.**
