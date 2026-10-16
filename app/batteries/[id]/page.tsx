@@ -37,7 +37,8 @@ export default async function BatteryPage({ params }: PageProps<"/batteries/[id]
             The optimiser uses the previous day&apos;s half-hourly prices as the forecast. Executing settles the plan against the delivery day&apos;s actual prices.
           </p>
         </CardHeader>
-        <CardContent><PlanForm batteryId={b.id} defaultDate={previousDay(today)} maxDate={today} /></CardContent>
+        <CardContent><PlanForm batteryId={b.id} defaultDate={previousDay(today)} maxDate={today}
+          existing={Object.fromEntries(plans.map((p) => [p.deliveryDate, { id: p.id, status: p.status }]))} /></CardContent>
       </Card>
       <Card>
         <CardHeader><CardTitle>Plans</CardTitle></CardHeader>

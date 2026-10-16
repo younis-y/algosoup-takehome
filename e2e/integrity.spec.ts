@@ -56,8 +56,15 @@ test("an approved plan cannot be overwritten by regenerating the same date", asy
   await page.goto(batteryUrl);
   await expect(page.getByRole("heading", { level: 1, name })).toBeVisible();
   await page.getByLabel("Delivery date").fill(DATE);
-  await page.getByRole("button", { name: "Generate plan" }).click();
+  // Prevent: the UI explains and disables regeneration for an approved date.
+  await expect(page.getByTestId("plan-locked")).toContainText("already approved");
+  const generate = page.getByRole("button", { name: "Generate plan" });
+  await expect(generate).toBeDisabled();
 
+  // Enforce: re-enable the button as a stale tab would; the database guard still refuses.
+  await page.evaluate(() =>
+    [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === "Generate plan")?.removeAttribute("disabled"));
+  await generate.click();
   // Next.js also renders an empty role="alert" route announcer, so match on text.
   await expect(
     page.getByRole("alert").filter({ hasText: /already approved and can't be regenerated/ }),

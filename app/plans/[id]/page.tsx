@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { gbp } from "@/lib/format";
+import { gbp, londonToday } from "@/lib/format";
 import type { BatterySpec } from "@/lib/optimise";
 
 export default async function PlanPage({ params }: PageProps<"/plans/[id]">) {
@@ -61,7 +61,8 @@ export default async function PlanPage({ params }: PageProps<"/plans/[id]">) {
             <CardTitle>Dispatch schedule</CardTitle>
             <p className="text-sm text-muted-foreground">Top: price. Bottom: energy bought (below zero) and sold (above), with state of charge.</p>
           </div>
-          <PlanActions planId={plan.id} status={plan.status} />
+          {/* Actual prices are complete only after the UK trading day ends. */}
+          <PlanActions planId={plan.id} status={plan.status} settlesAfter={plan.deliveryDate >= londonToday() ? plan.deliveryDate : null} />
         </CardHeader>
         <CardContent>
           <DispatchChart showActual={executed} rows={intervals.map((i) => ({
