@@ -3,7 +3,7 @@
 Plans which half-hours a GB grid battery should charge and discharge on a given day, shows the expected £, and tracks the plan from draft to approval to execution, then compares realised P&L with what was expected.
 
 - **Live demo:** https://algosoup-takehome-ten.vercel.app
-- **Repo:** <to be added>
+- **Repo:** https://github.com/younis-y/algosoup-takehome
 
 ## Who it's for
 
