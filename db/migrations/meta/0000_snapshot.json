@@ -1,0 +1,433 @@
+{
+  "id": "52591f79-2d34-4000-9f58-63051dddff9d",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.ancillary_price": {
+      "name": "ancillary_price",
+      "schema": "",
+      "columns": {
+        "delivery_start": {
+          "name": "delivery_start",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "delivery_end": {
+          "name": "delivery_end",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "product": {
+          "name": "product",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "price_gbp_mw_h": {
+          "name": "price_gbp_mw_h",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "ancillary_price_delivery_start_product_pk": {
+          "name": "ancillary_price_delivery_start_product_pk",
+          "columns": [
+            "delivery_start",
+            "product"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.battery": {
+      "name": "battery",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "capacity_mwh": {
+          "name": "capacity_mwh",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "power_mw": {
+          "name": "power_mw",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rte": {
+          "name": "rte",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "min_soc": {
+          "name": "min_soc",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "max_soc": {
+          "name": "max_soc",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "max_cycles_per_day": {
+          "name": "max_cycles_per_day",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "battery_capacity_pos": {
+          "name": "battery_capacity_pos",
+          "value": "\"battery\".\"capacity_mwh\" > 0"
+        },
+        "battery_power_pos": {
+          "name": "battery_power_pos",
+          "value": "\"battery\".\"power_mw\" > 0"
+        },
+        "battery_rte_range": {
+          "name": "battery_rte_range",
+          "value": "\"battery\".\"rte\" > 0 AND \"battery\".\"rte\" <= 1"
+        },
+        "battery_soc_range": {
+          "name": "battery_soc_range",
+          "value": "\"battery\".\"min_soc\" >= 0 AND \"battery\".\"min_soc\" < \"battery\".\"max_soc\" AND \"battery\".\"max_soc\" <= 1"
+        },
+        "battery_cycles_pos": {
+          "name": "battery_cycles_pos",
+          "value": "\"battery\".\"max_cycles_per_day\" > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.dispatch_plan": {
+      "name": "dispatch_plan",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "battery_id": {
+          "name": "battery_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "delivery_date": {
+          "name": "delivery_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "forecast_date": {
+          "name": "forecast_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "plan_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'draft'"
+        },
+        "params": {
+          "name": "params",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expected_pnl": {
+          "name": "expected_pnl",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "realised_pnl": {
+          "name": "realised_pnl",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pnl_breakdown": {
+          "name": "pnl_breakdown",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "approved_at": {
+          "name": "approved_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "executed_at": {
+          "name": "executed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "dispatch_plan_battery_id_battery_id_fk": {
+          "name": "dispatch_plan_battery_id_battery_id_fk",
+          "tableFrom": "dispatch_plan",
+          "tableTo": "battery",
+          "columnsFrom": [
+            "battery_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "plan_battery_day": {
+          "name": "plan_battery_day",
+          "nullsNotDistinct": false,
+          "columns": [
+            "battery_id",
+            "delivery_date"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.plan_interval": {
+      "name": "plan_interval",
+      "schema": "",
+      "columns": {
+        "plan_id": {
+          "name": "plan_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "period": {
+          "name": "period",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "action": {
+          "name": "action",
+          "type": "interval_action",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mwh": {
+          "name": "mwh",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "soc_after_mwh": {
+          "name": "soc_after_mwh",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reserved_mw": {
+          "name": "reserved_mw",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "forecast_price": {
+          "name": "forecast_price",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "actual_price": {
+          "name": "actual_price",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "plan_interval_plan_id_dispatch_plan_id_fk": {
+          "name": "plan_interval_plan_id_dispatch_plan_id_fk",
+          "tableFrom": "plan_interval",
+          "tableTo": "dispatch_plan",
+          "columnsFrom": [
+            "plan_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "plan_interval_plan_id_period_pk": {
+          "name": "plan_interval_plan_id_period_pk",
+          "columns": [
+            "plan_id",
+            "period"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.price": {
+      "name": "price",
+      "schema": "",
+      "columns": {
+        "settlement_date": {
+          "name": "settlement_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "settlement_period": {
+          "name": "settlement_period",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "start_time": {
+          "name": "start_time",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "price_gbp_mwh": {
+          "name": "price_gbp_mwh",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fetched_at": {
+          "name": "fetched_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "price_settlement_date_settlement_period_pk": {
+          "name": "price_settlement_date_settlement_period_pk",
+          "columns": [
+            "settlement_date",
+            "settlement_period"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.interval_action": {
+      "name": "interval_action",
+      "schema": "public",
+      "values": [
+        "charge",
+        "discharge",
+        "idle",
+        "reserve"
+      ]
+    },
+    "public.plan_status": {
+      "name": "plan_status",
+      "schema": "public",
+      "values": [
+        "draft",
+        "approved",
+        "executed"
+      ]
+    }
+  },
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
