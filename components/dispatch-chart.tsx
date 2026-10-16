@@ -4,7 +4,7 @@ import { Bar, CartesianGrid, ComposedChart, Line, ReferenceArea, ReferenceLine, 
 import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 
 export type ChartRow = {
-  period: number; forecastPrice: number | null; actualPrice: number | null;
+  period: number; time: string; forecastPrice: number | null; actualPrice: number | null;
   charge: number; discharge: number; soc: number; reserved: boolean;
 };
 
@@ -21,14 +21,14 @@ function reservedRuns(rows: ChartRow[]) {
 
 // Two panels on one time axis instead of a dual-axis chart: £/MWh above, MWh below.
 const priceConfig = {
-  forecastPrice: { label: "Forecast (D‑1) £/MWh", color: "var(--viz-1)" },
-  actualPrice: { label: "Actual £/MWh", color: "var(--viz-2)" },
+  forecastPrice: { label: "Guessed price (£/MWh)", color: "var(--viz-1)" },
+  actualPrice: { label: "Real price (£/MWh)", color: "var(--viz-2)" },
 } satisfies ChartConfig;
 
 const energyConfig = {
-  charge: { label: "Charge (MWh, import)", color: "var(--viz-1)" },
-  discharge: { label: "Discharge (MWh, export)", color: "var(--viz-2)" },
-  soc: { label: "State of charge (MWh)", color: "var(--viz-3)" },
+  charge: { label: "Buying (MWh)", color: "var(--viz-1)" },
+  discharge: { label: "Selling (MWh)", color: "var(--viz-2)" },
+  soc: { label: "How full (MWh)", color: "var(--viz-3)" },
 } satisfies ChartConfig;
 
 const axis = { tickLine: false, axisLine: false, fontSize: 11 } as const;
@@ -48,7 +48,7 @@ export function DispatchChart({ rows, showActual }: { rows: ChartRow[]; showActu
           <YAxis {...axis} width={48} tickFormatter={(v) => `£${v}`} />
           {shade}
           <ReferenceLine y={0} stroke="var(--muted-foreground)" strokeOpacity={0.6} />
-          <ChartTooltip content={<ChartTooltipContent labelFormatter={(_, p) => `Period ${p?.[0]?.payload.period}`} />} />
+          <ChartTooltip content={<ChartTooltipContent labelFormatter={(_, p) => p?.[0]?.payload.time} />} />
           <Line dataKey="forecastPrice" type="stepAfter" stroke="var(--color-forecastPrice)" strokeWidth={2} dot={false} connectNulls={false} isAnimationActive={false} />
           {showActual && <Line dataKey="actualPrice" type="stepAfter" stroke="var(--color-actualPrice)" strokeWidth={2} strokeDasharray="4 3" dot={false} isAnimationActive={false} />}
           {showActual && <ChartLegend content={<ChartLegendContent />} />}
@@ -57,11 +57,11 @@ export function DispatchChart({ rows, showActual }: { rows: ChartRow[]; showActu
       <ChartContainer config={energyConfig} className="h-56 w-full">
         <ComposedChart data={data} syncId="plan" margin={{ left: 4, right: 8 }} barCategoryGap={2}>
           <CartesianGrid vertical={false} strokeOpacity={0.4} />
-          <XAxis dataKey="period" {...axis} interval={5} />
+          <XAxis dataKey="period" {...axis} interval={5} tickFormatter={(p) => rows.find((r) => r.period === p)?.time ?? ""} />
           <YAxis {...axis} width={48} />
           {shade}
           <ReferenceLine y={0} stroke="var(--muted-foreground)" strokeOpacity={0.6} />
-          <ChartTooltip content={<ChartTooltipContent labelFormatter={(_, p) => `Period ${p?.[0]?.payload.period}`} />} />
+          <ChartTooltip content={<ChartTooltipContent labelFormatter={(_, p) => p?.[0]?.payload.time} />} />
           <Bar dataKey="charge" fill="var(--color-charge)" radius={[0, 0, 4, 4]} isAnimationActive={false} />
           <Bar dataKey="discharge" fill="var(--color-discharge)" radius={[4, 4, 0, 0]} isAnimationActive={false} />
           <Line dataKey="soc" type="linear" stroke="var(--color-soc)" strokeWidth={2} dot={false} isAnimationActive={false} />

@@ -4,6 +4,7 @@ const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
 
 export default defineConfig({
   testDir: "e2e",
+  globalTeardown: "./e2e/cleanup.ts",
   timeout: 60_000,
   retries: 0,
   reporter: "list",

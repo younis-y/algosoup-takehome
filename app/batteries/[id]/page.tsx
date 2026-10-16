@@ -4,10 +4,11 @@ import { notFound } from "next/navigation";
 import { desc, eq } from "drizzle-orm";
 import { battery, db, dispatchPlan } from "@/db";
 import { PlanForm } from "@/components/forms";
+import { Abbr, Glossary } from "@/components/glossary";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { gbp, londonToday } from "@/lib/format";
+import { STAGE, gbp, homesForADay, londonToday, niceDate } from "@/lib/format";
 import { previousDay } from "@/lib/periods";
 
 export default async function BatteryPage({ params }: PageProps<"/batteries/[id]">) {
@@ -20,21 +21,29 @@ export default async function BatteryPage({ params }: PageProps<"/batteries/[id]
   ]);
   if (!b) notFound();
   const today = londonToday();
+  const usable = (b.maxSoc - b.minSoc) * b.capacityMwh;
 
   return (
     <div className="grid gap-6">
       <div>
-        <Link href="/" className="text-sm text-muted-foreground hover:underline">← Batteries</Link>
+        <Link href="/" className="text-sm text-muted-foreground hover:underline">← All batteries</Link>
         <h1 className="text-2xl font-semibold">{b.name}</h1>
         <p className="tabular-nums text-sm text-muted-foreground">
-          {b.capacityMwh} MWh · {b.powerMw} MW · RTE {Math.round(b.rte * 100)}% · SoC {Math.round(b.minSoc * 100)}–{Math.round(b.maxSoc * 100)}% · ≤{b.maxCyclesPerDay} cycles/day
+          Holds {b.capacityMwh} <Abbr term="MWh" /> · fills or empties at {b.powerMw} <Abbr term="MW" /> · gets back {Math.round(b.rte * 100)}% ·
+          {" "}kept between {Math.round(b.minSoc * 100)}% and {Math.round(b.maxSoc * 100)}% <Abbr term="Charge">charge</Abbr> ·
+          {" "}up to {b.maxCyclesPerDay} <Abbr term="Fill">fills</Abbr> a day
+        </p>
+        <p className="text-sm text-muted-foreground">
+          It can use {usable.toFixed(0)} MWh, about enough electricity for {homesForADay(usable).toLocaleString("en-GB")} homes for a day.
         </p>
       </div>
       <Card>
         <CardHeader>
           <CardTitle>Plan a day</CardTitle>
           <p className="text-sm text-muted-foreground">
-            The optimiser uses the previous day&apos;s half-hourly prices as the forecast. Executing settles the plan against the delivery day&apos;s actual prices.
+            Pick a day. We use the day before&apos;s prices as our <Abbr term="Guess">guess</Abbr>, then choose the cheapest
+            {" "}<Abbr term="Half-hour">half-hours</Abbr> to buy and the priciest to sell. If a standby job (<Abbr term="DC" />) pays more, we take that too.
+            Once the day is over, we check the plan against the real prices.
           </p>
         </CardHeader>
         <CardContent><PlanForm batteryId={b.id} defaultDate={previousDay(today)} maxDate={today}
@@ -46,24 +55,25 @@ export default async function BatteryPage({ params }: PageProps<"/batteries/[id]
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Delivery date</TableHead><TableHead>Status</TableHead>
-                <TableHead className="text-right">Expected P&amp;L</TableHead><TableHead className="text-right">Realised P&amp;L</TableHead>
+                <TableHead>Day</TableHead><TableHead><Abbr term="Draft">Stage</Abbr></TableHead>
+                <TableHead className="text-right">Money expected</TableHead><TableHead className="text-right">Money made</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {plans.map((p) => (
                 <TableRow key={p.id}>
-                  <TableCell><Link className="font-medium hover:underline" href={`/plans/${p.id}`}>{p.deliveryDate}</Link></TableCell>
-                  <TableCell><Badge variant={p.status}>{p.status}</Badge></TableCell>
+                  <TableCell><Link className="font-medium hover:underline" href={`/plans/${p.id}`}>{niceDate(p.deliveryDate)}</Link></TableCell>
+                  <TableCell><Badge variant={p.status}>{STAGE[p.status]}</Badge></TableCell>
                   <TableCell className="text-right tabular-nums">{gbp(p.expectedPnl)}</TableCell>
                   <TableCell className="text-right tabular-nums">{gbp(p.realisedPnl)}</TableCell>
                 </TableRow>
               ))}
-              {plans.length === 0 && <TableRow><TableCell colSpan={4} className="text-muted-foreground">No plans yet.</TableCell></TableRow>}
+              {plans.length === 0 && <TableRow><TableCell colSpan={4} className="text-muted-foreground">No plans yet. Pick a day above to make one.</TableCell></TableRow>}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
+      <Glossary />
     </div>
   );
 }

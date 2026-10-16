@@ -18,11 +18,11 @@ const EPS = 1e-6;
 
 export function validateBattery(b: BatterySpec): string[] {
   const errors: string[] = [];
-  if (!(b.capacityMwh > 0)) errors.push("Capacity must be positive");
-  if (!(b.powerMw > 0)) errors.push("Power must be positive");
-  if (!(b.rte > 0 && b.rte <= 1)) errors.push("Round-trip efficiency must be in (0, 1]");
-  if (!(b.minSoc >= 0 && b.minSoc < b.maxSoc && b.maxSoc <= 1)) errors.push("Min SoC must be below max SoC, both within 0–1");
-  if (!(b.maxCyclesPerDay > 0)) errors.push("Max cycles per day must be positive");
+  if (!(b.capacityMwh > 0)) errors.push("Storage must be more than 0 MWh");
+  if (!(b.powerMw > 0)) errors.push("Speed must be more than 0 MW");
+  if (!(b.rte > 0 && b.rte <= 1)) errors.push("Energy that comes back (efficiency) must be more than 0% and at most 100%");
+  if (!(b.minSoc >= 0 && b.minSoc < b.maxSoc && b.maxSoc <= 1)) errors.push("The lower charge limit must be below the upper one, both between 0% and 100%");
+  if (!(b.maxCyclesPerDay > 0)) errors.push("Fills a day must be more than 0");
   return errors;
 }
 

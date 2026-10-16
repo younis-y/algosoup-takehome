@@ -15,11 +15,11 @@ async function fillBattery(page: Page, b: Battery) {
   await expect(page.getByRole("heading", { name: "Batteries" })).toBeVisible();
   await page.getByLabel("What's it called?", { exact: true }).fill(b.name);
   await page.getByLabel("How much energy can it store?", { exact: true }).fill(b.capacity);
-  await page.getByLabel("How fast can it charge or discharge?", { exact: true }).fill(b.power);
-  await page.getByLabel("How much comes back after a round trip?", { exact: true }).fill(b.efficiency);
+  await page.getByLabel("How fast can it fill up or empty?", { exact: true }).fill(b.power);
+  await page.getByLabel("How much energy comes back out?", { exact: true }).fill(b.efficiency);
   await page.getByLabel("Minimum charge (%)", { exact: true }).fill(b.minSoc);
   await page.getByLabel("Maximum charge (%)", { exact: true }).fill(b.maxSoc);
-  await page.getByLabel("Cycles allowed per day", { exact: true }).fill(b.cycles);
+  await page.getByLabel("How many full fills a day?", { exact: true }).fill(b.cycles);
   await page.getByRole("button", { name: "Add battery" }).click();
 }
 
@@ -45,7 +45,7 @@ async function forceSubmit(page: Page, button: string) {
 test("prevents, then rejects, a battery with impossible efficiency", async ({ page }) => {
   await page.goto("/");
   await page.getByLabel("What's it called?", { exact: true }).fill(`E2E bad ${Date.now()}`);
-  await page.getByLabel("How much comes back after a round trip?", { exact: true }).fill("120");
+  await page.getByLabel("How much energy comes back out?", { exact: true }).fill("120");
   // Prevent: the reason is shown and the action is unavailable.
   await expect(page.getByTestId("battery-problems")).toContainText(/efficiency/i);
   await expect(page.getByRole("button", { name: "Add battery" })).toBeDisabled();
@@ -62,7 +62,7 @@ test("max SoC cannot be set below min SoC", async ({ page }) => {
   await page.getByLabel("Minimum charge (%)", { exact: true }).fill("60");
   await expect(page.getByLabel("Maximum charge (%)", { exact: true })).toHaveAttribute("min", "61");
   await page.getByLabel("Maximum charge (%)", { exact: true }).fill("40");
-  await expect(page.getByTestId("battery-problems")).toContainText("Min SoC must be below max SoC");
+  await expect(page.getByTestId("battery-problems")).toContainText("The lower charge limit must be below the upper one");
   await expect(page.getByRole("button", { name: "Add battery" })).toBeDisabled();
 });
 
@@ -74,25 +74,25 @@ test("create battery, generate, approve and execute a plan", async ({ page }) =>
   await expect(page.getByRole("heading", { level: 1, name })).toBeVisible();
 
   await page.getByLabel("Which day are you planning?", { exact: true }).fill("2026-10-14");
-  await page.getByRole("button", { name: "Generate plan" }).click();
+  await page.getByRole("button", { name: "Make a plan" }).click();
 
   const status = page.getByTestId("plan-status");
   const approve = page.getByRole("button", { name: "Approve plan" });
-  const execute = page.getByRole("button", { name: "Mark executed" });
+  const execute = page.getByRole("button", { name: "Mark as done" });
 
   await expect(page).toHaveURL(/\/plans\/[^/]+$/);
-  await expect(status).toHaveText("draft");
+  await expect(status).toHaveText("Draft");
   await expect(page.getByText("Expected P&L").first()).toBeVisible();
   // Seeded NESO prices for 2026-10-14 make Dynamic Containment worth committing.
-  await expect(page.getByTestId("pnl-mix")).toContainText("more than arbitrage alone");
+  await expect(page.getByTestId("pnl-mix")).toContainText("more than buying and selling alone");
   await expect(execute).toBeHidden();
 
   await approve.click();
-  await expect(status).toHaveText("approved");
+  await expect(status).toHaveText("Approved");
   await expect(approve).toBeHidden();
 
   await execute.click();
-  await expect(status).toHaveText("executed");
+  await expect(status).toHaveText("Done");
   await expect(page.getByText("Realised P&L").first()).toBeVisible();
 
   await page.screenshot({ path: "e2e/screenshots/executed-plan.png", fullPage: true });

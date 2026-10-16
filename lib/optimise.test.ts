@@ -18,10 +18,10 @@ describe("validateBattery", () => {
     expect(validateBattery(demo)).toEqual([]);
   });
   it("rejects efficiency above 100%", () => {
-    expect(validateBattery({ ...demo, rte: 1.2 })).toContain("Round-trip efficiency must be in (0, 1]");
+    expect(validateBattery({ ...demo, rte: 1.2 })).toContain("Energy that comes back (efficiency) must be more than 0% and at most 100%");
   });
   it("rejects max SoC at or below min SoC", () => {
-    expect(validateBattery({ ...demo, minSoc: 0.8, maxSoc: 0.2 })).toContain("Min SoC must be below max SoC, both within 0–1");
+    expect(validateBattery({ ...demo, minSoc: 0.8, maxSoc: 0.2 })).toContain("The lower charge limit must be below the upper one, both between 0% and 100%");
   });
   it("rejects non-positive power, capacity and cycle cap", () => {
     expect(validateBattery({ ...demo, powerMw: 0, capacityMwh: -1, maxCyclesPerDay: 0 })).toHaveLength(3);

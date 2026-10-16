@@ -12,6 +12,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { validateBattery } from "@/lib/optimise";
+import { STAGE, homesForADay, niceDate } from "@/lib/format";
 
 function ErrorAlert({ state }: { state: FormState }) {
   if (!state?.error) return null;
@@ -63,28 +64,31 @@ export function BatteryForm() {
   const usable = (spec.maxSoc - spec.minSoc) * spec.capacityMwh;
   const bind = (k: keyof typeof initial) => ({ value: v[k], onChange: (e: React.ChangeEvent<HTMLInputElement>) => setV({ ...v, [k]: e.target.value }) });
   const num = { type: "number", step: "any", inputMode: "decimal" } as const;
-  const rangeInput = cn("w-14 min-w-0 bg-transparent p-0 text-base leading-6 tabular-nums outline-none", noSpinner);
+  const fit = (value: string) => `${Math.max(2, value.length) + 0.5}ch`; // input width follows its digits
+  const rangeInput = cn("min-w-0 text-right bg-transparent p-0 text-base leading-6 tabular-nums outline-none", noSpinner);
 
   return (
     <form action={action} className="grid gap-3">
-      <Field id="name" label="What's it called?" placeholder="e.g. Cottam BESS" value={name} onChange={(e) => setName(e.target.value)} />
+      <Field id="name" label="What's it called?" placeholder="e.g. Riverside Big Battery" value={name} onChange={(e) => setName(e.target.value)} />
       <div className="grid gap-3 sm:grid-cols-2">
         <Field id="capacityMwh" label="How much energy can it store?" unit="MWh" {...num} min={0.1} {...bind("capacityMwh")} />
-        <Field id="powerMw" label="How fast can it charge or discharge?" unit="MW" {...num} min={0.1} {...bind("powerMw")} />
-        <Field id="rte" label="How much comes back after a round trip?" unit="%" {...num} min={1} max={100} {...bind("rte")} />
-        <Field id="maxCyclesPerDay" label="Cycles allowed per day" unit="/ day" {...num} min={0.1} {...bind("maxCyclesPerDay")} />
+        <Field id="powerMw" label="How fast can it fill up or empty?" unit="MW" {...num} min={0.1} {...bind("powerMw")} />
+        <Field id="rte" label="How much energy comes back out?" unit="%" {...num} min={1} max={100} {...bind("rte")} />
+        <Field id="maxCyclesPerDay" label="How many full fills a day?" unit="/ day" {...num} min={0.1} {...bind("maxCyclesPerDay")} />
         {/* One box, two inputs: still posts minSoc and maxSoc separately. */}
         <div role="group" aria-labelledby="socRange-label" className={cn(box, "px-4 pt-6 pb-2 focus-within:ring-2 focus-within:ring-ring/50 sm:col-span-2")}>
           <label id="socRange-label" htmlFor="minSoc" className={floatingLabel}>Keep its charge between</label>
-          <div className="flex items-center gap-2">
-            <input id="minSoc" name="minSoc" required aria-label="Minimum charge (%)" className={rangeInput}
+          {/* Each number carries its own %, sized to its digits, so it reads "10 % to 90 %". */}
+          <div className="flex items-baseline gap-1.5">
+            <input id="minSoc" name="minSoc" required aria-label="Minimum charge (%)" className={rangeInput} style={{ width: fit(v.minSoc) }}
               {...num} min={0} max={Number.isFinite(n("maxSoc")) ? n("maxSoc") - 1 : 99} {...bind("minSoc")} />
-            <span aria-hidden="true" className="text-muted-foreground">–</span>
+            <span aria-hidden="true" className="text-muted-foreground">%</span>
+            <span aria-hidden="true" className="px-1.5 text-muted-foreground">to</span>
             {/* Like a return date that can't precede the outbound date: max SoC starts above min SoC. */}
-            <input id="maxSoc" name="maxSoc" required aria-label="Maximum charge (%)" className={rangeInput}
+            <input id="maxSoc" name="maxSoc" required aria-label="Maximum charge (%)" className={rangeInput} style={{ width: fit(v.maxSoc) }}
               {...num} min={(n("minSoc") || 0) + 1} max={100} {...bind("maxSoc")} />
+            <span aria-hidden="true" className="text-muted-foreground">%</span>
           </div>
-          <span aria-hidden="true" className={unitText}>%</span>
         </div>
       </div>
       {problems.length > 0 ? (
@@ -93,7 +97,7 @@ export function BatteryForm() {
         </ul>
       ) : (
         <p className="px-1 text-sm text-muted-foreground">
-          Usable energy {usable.toFixed(1)} MWh · {(usable / spec.powerMw).toFixed(1)} h at full power · 1 cycle = {usable.toFixed(1)} MWh discharged
+          It can use {usable.toFixed(0)} MWh, about enough for {homesForADay(usable).toLocaleString("en-GB")} homes for a day, and fills up in {(usable / spec.powerMw).toFixed(1)} hours at full speed.
         </p>
       )}
       <ErrorAlert state={state} />
@@ -128,15 +132,15 @@ export function PlanForm({ batteryId, defaultDate, maxDate, existing }: {
           <Field id="deliveryDate" label="Which day are you planning?" type="date" value={date} max={maxDate} onChange={(e) => setDate(e.target.value)} />
         </div>
         <Button type="submit" disabled={pending || !date || locked || future} className="h-14 px-6">
-          {pending ? "Optimising…" : plan?.status === "draft" ? "Regenerate draft" : "Generate plan"}
+          {pending ? "Working it out…" : plan?.status === "draft" ? "Make it again" : "Make a plan"}
         </Button>
       </div>
       {locked && (
         <p className="px-1 text-sm text-muted-foreground" data-testid="plan-locked">
-          The plan for {date} is already {plan.status} and can&apos;t be regenerated. <Link className="underline" href={`/plans/${plan.id}`}>View it</Link>
+          The plan for {niceDate(date)} is already {STAGE[plan.status].toLowerCase()}, so it can&apos;t be changed. <Link className="underline" href={`/plans/${plan.id}`}>View it</Link>
         </p>
       )}
-      {future && <p className="px-1 text-sm text-muted-foreground">Plans can be made up to today ({maxDate}); the forecast needs yesterday&apos;s prices.</p>}
+      {future && <p className="px-1 text-sm text-muted-foreground">You can plan up to today. We need the day before&apos;s prices to make a guess.</p>}
       <ErrorAlert state={state} />
     </form>
   );
@@ -151,16 +155,17 @@ export function PlanActions({ planId, status, settlesAfter }: { planId: number; 
         <form action={approve}>
           <input type="hidden" name="planId" value={planId} />
           <Button type="submit" disabled={approving} className="h-12 px-6">{approving ? "Approving…" : "Approve plan"}</Button>
+          <p className="mt-1 text-right text-xs text-muted-foreground">Happy with it? Approving locks it in.</p>
         </form>
       )}
       {status === "approved" && (
         <form action={execute}>
           <input type="hidden" name="planId" value={planId} />
-          <Button type="submit" disabled={executing || !!settlesAfter} className="h-12 px-6">{executing ? "Settling…" : "Mark executed"}</Button>
+          <Button type="submit" disabled={executing || !!settlesAfter} className="h-12 px-6">{executing ? "Checking real prices…" : "Mark as done"}</Button>
         </form>
       )}
       {status === "approved" && settlesAfter && (
-        <p className="text-xs text-muted-foreground">Available once {settlesAfter} has fully settled</p>
+        <p className="text-xs text-muted-foreground">You can mark it done once {settlesAfter} is over and the real prices are in.</p>
       )}
       <ErrorAlert state={approveState ?? executeState} />
     </div>

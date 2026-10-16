@@ -8,7 +8,7 @@ import { getPrices } from "@/lib/elexon";
 import { planWithFrequency, type DcBlock } from "@/lib/frequency";
 import { getDcPrices } from "@/lib/neso";
 import { settle, validateBattery, type BatterySpec } from "@/lib/optimise";
-import { londonToday } from "@/lib/format";
+import { STAGE, londonToday, niceDate } from "@/lib/format";
 import { expectedPeriods, previousDay } from "@/lib/periods";
 
 export type FormState = { error?: string } | undefined;
@@ -33,7 +33,7 @@ export async function generatePlan(_: FormState, f: FormData): Promise<FormState
   const batteryId = num(f, "batteryId");
   const deliveryDate = f.get("deliveryDate");
   if (!isDate(deliveryDate)) return { error: "Pick a delivery date" };
-  if (deliveryDate > londonToday()) return { error: "Plans can be made up to today; the forecast needs the previous day's prices" };
+  if (deliveryDate > londonToday()) return { error: "You can plan up to today. We need the day before's prices to make a guess" };
   if (!Number.isInteger(batteryId)) return { error: "Battery not found" };
   const b = await db.query.battery.findFirst({ where: eq(battery.id, batteryId) });
   if (!b) return { error: "Battery not found" };
@@ -43,7 +43,7 @@ export async function generatePlan(_: FormState, f: FormData): Promise<FormState
   const forecast = await getPrices(forecastDate);
   const n = expectedPeriods(deliveryDate);
   if (forecast.rows.length < n / 2) {
-    return { error: `Not enough forecast prices for ${forecastDate} (${forecast.rows.length}/${forecast.expected})${forecast.error ? `: ${forecast.error}` : ""}` };
+    return { error: `Not enough prices from ${niceDate(forecastDate)} to make a guess (${forecast.rows.length}/${forecast.expected})${forecast.error ? `: ${forecast.error}` : ""}` };
   }
   const byPeriod = new Map(forecast.rows.map((r) => [r.settlementPeriod, r.priceGbpMwh]));
   const spec: BatterySpec = {
@@ -92,7 +92,7 @@ export async function generatePlan(_: FormState, f: FormData): Promise<FormState
     const existing = await db.query.dispatchPlan.findFirst({
       where: and(eq(dispatchPlan.batteryId, batteryId), eq(dispatchPlan.deliveryDate, deliveryDate)),
     });
-    if (existing && existing.status !== "draft") return { error: `A plan for ${deliveryDate} is already ${existing.status} and can't be regenerated` };
+    if (existing && existing.status !== "draft") return { error: `The plan for ${niceDate(deliveryDate)} is already ${STAGE[existing.status].toLowerCase()}, so it can't be changed` };
     throw e;
   }
   revalidatePath(`/batteries/${batteryId}`);
@@ -118,7 +118,7 @@ export async function executePlan(_: FormState, f: FormData): Promise<FormState>
 
   const actual = await getPrices(plan.deliveryDate);
   if (!actual.complete) {
-    return { error: `Actual prices for ${plan.deliveryDate} are incomplete (${actual.rows.length}/${actual.expected}). Try again once the day has settled.` };
+    return { error: `The real prices for ${niceDate(plan.deliveryDate)} aren't all in yet (${actual.rows.length} of ${actual.expected} half-hours). Try again once the day is over.` };
   }
   const intervals = await db.select().from(planInterval).where(eq(planInterval.planId, id));
   const actualByPeriod = new Map(actual.rows.map((r) => [r.settlementPeriod, r.priceGbpMwh]));
@@ -137,6 +137,6 @@ export async function executePlan(_: FormState, f: FormData): Promise<FormState>
       db.update(planInterval).set({ actualPrice: actualByPeriod.get(i.period) ?? null })
         .where(and(eq(planInterval.planId, id), eq(planInterval.period, i.period)))),
   ]);
-  if (flipped.length === 0) return { error: "Plan was changed by someone else; reload" };
+  if (flipped.length === 0) return { error: "Someone else changed this plan just now. Reload the page." };
   revalidatePath(`/plans/${id}`);
 }
