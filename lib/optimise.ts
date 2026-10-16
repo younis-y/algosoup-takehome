@@ -10,7 +10,7 @@ export type BatterySpec = {
   minSoc: number; maxSoc: number; maxCyclesPerDay: number;
 };
 export type Slot = { period: number; price: number | null }; // null = no price → idle
-export type Action = "charge" | "discharge" | "idle";
+export type Action = "charge" | "discharge" | "idle" | "reserve"; // reserve = held for frequency response
 export type Interval = { period: number; action: Action; mwh: number; socAfterMwh: number; price: number | null };
 export type Plan = { intervals: Interval[]; expectedPnl: number; cycles: number };
 
@@ -109,7 +109,7 @@ export function optimise(b: BatterySpec, slots: Slot[]): Plan {
 function cashflow(intervals: Interval[], priceOf: (i: Interval) => number | null | undefined) {
   let pnl = 0;
   for (const i of intervals) {
-    if (i.action === "idle") continue;
+    if (i.action !== "charge" && i.action !== "discharge") continue;
     const p = priceOf(i) ?? 0;
     pnl += i.action === "discharge" ? i.mwh * p : -i.mwh * p;
   }
@@ -118,7 +118,7 @@ function cashflow(intervals: Interval[], priceOf: (i: Interval) => number | null
 
 // Settle planned volumes against actual prices. Null if any traded period has no actual price.
 export function settle(intervals: Interval[], actual: Map<number, number>): number | null {
-  if (intervals.some((i) => i.action !== "idle" && !actual.has(i.period))) return null;
+  if (intervals.some((i) => (i.action === "charge" || i.action === "discharge") && !actual.has(i.period))) return null;
   return cashflow(intervals, (i) => actual.get(i.period));
 }
 

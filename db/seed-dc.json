@@ -1,0 +1,74 @@
+[
+  {
+    "deliveryStart": "2026-10-13T22:00:00.000Z",
+    "deliveryEnd": "2026-10-14T02:00:00.000Z",
+    "product": "DCH",
+    "priceGbpMwH": 2.61
+  },
+  {
+    "deliveryStart": "2026-10-13T22:00:00.000Z",
+    "deliveryEnd": "2026-10-14T02:00:00.000Z",
+    "product": "DCL",
+    "priceGbpMwH": 1.88
+  },
+  {
+    "deliveryStart": "2026-10-14T02:00:00.000Z",
+    "deliveryEnd": "2026-10-14T06:00:00.000Z",
+    "product": "DCH",
+    "priceGbpMwH": 4.02
+  },
+  {
+    "deliveryStart": "2026-10-14T02:00:00.000Z",
+    "deliveryEnd": "2026-10-14T06:00:00.000Z",
+    "product": "DCL",
+    "priceGbpMwH": 6.26
+  },
+  {
+    "deliveryStart": "2026-10-14T06:00:00.000Z",
+    "deliveryEnd": "2026-10-14T10:00:00.000Z",
+    "product": "DCH",
+    "priceGbpMwH": 0.47
+  },
+  {
+    "deliveryStart": "2026-10-14T06:00:00.000Z",
+    "deliveryEnd": "2026-10-14T10:00:00.000Z",
+    "product": "DCL",
+    "priceGbpMwH": 14.72
+  },
+  {
+    "deliveryStart": "2026-10-14T10:00:00.000Z",
+    "deliveryEnd": "2026-10-14T14:00:00.000Z",
+    "product": "DCH",
+    "priceGbpMwH": 19.81
+  },
+  {
+    "deliveryStart": "2026-10-14T10:00:00.000Z",
+    "deliveryEnd": "2026-10-14T14:00:00.000Z",
+    "product": "DCL",
+    "priceGbpMwH": 4.16
+  },
+  {
+    "deliveryStart": "2026-10-14T14:00:00.000Z",
+    "deliveryEnd": "2026-10-14T18:00:00.000Z",
+    "product": "DCH",
+    "priceGbpMwH": 4.35
+  },
+  {
+    "deliveryStart": "2026-10-14T14:00:00.000Z",
+    "deliveryEnd": "2026-10-14T18:00:00.000Z",
+    "product": "DCL",
+    "priceGbpMwH": 12.25
+  },
+  {
+    "deliveryStart": "2026-10-14T18:00:00.000Z",
+    "deliveryEnd": "2026-10-14T22:00:00.000Z",
+    "product": "DCH",
+    "priceGbpMwH": 1.58
+  },
+  {
+    "deliveryStart": "2026-10-14T18:00:00.000Z",
+    "deliveryEnd": "2026-10-14T22:00:00.000Z",
+    "product": "DCL",
+    "priceGbpMwH": 5.47
+  }
+]
