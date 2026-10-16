@@ -30,11 +30,11 @@ All in `db/schema.ts` (Drizzle, Postgres on Neon).
 |---|---|
 | `battery` | Asset settings. CHECK constraints: capacity, power and cycles > 0; `0 < rte ≤ 1`; `0 ≤ min_soc < max_soc ≤ 1`. |
 | `price` | Half-hourly wholesale price. PK `(settlement_date, settlement_period)`; `source` is `elexon` or `seed`. |
-| `ancillary_price` | NESO Dynamic Containment (DCH/DCL) clearing prices per EFA block. Collected for frequency-response stacking; the optimiser doesn't use them yet. |
+| `ancillary_price` | NESO Dynamic Containment (DCH/DCL) clearing prices per EFA block, used for frequency-response stacking. |
 | `dispatch_plan` | One plan per battery per delivery date. `params` (jsonb) snapshots the battery settings at plan time; holds status, expected and realised P&L. |
 | `plan_interval` | One row per period: action, grid-side MWh, SoC after, forecast price, actual price. |
 
-Prices and P&L use `double precision` rather than `numeric`. Dates use Drizzle's string mode (`'2026-10-14'`), so no timezone shifts happen in JS. The schema already has a `reserve` action, `reserved_mw` and `pnl_breakdown` for the frequency-response work in "What's next".
+Prices and P&L use `double precision` rather than `numeric`. Dates use Drizzle's string mode (`'2026-10-14'`), so no timezone shifts happen in JS. Periods held for frequency response have action `reserve` with `reserved_mw` set; `pnl_breakdown` splits expected P&L into wholesale and DC.
 
 ## Optimiser: method and limits
 
@@ -64,13 +64,34 @@ Prices and P&L use `double precision` rather than `numeric`. Dates use Drizzle's
 - Clock-change days with 46 or 50 periods. The expected count comes from Europe/London midnights (`lib/periods.ts`).
 - Missing periods, which are reported, idled in planning, and block execution.
 - API down: prices are cached in the DB, and 2026‑10‑13 and 2026‑10‑14 are seeded from snapshot files.
-- Nonsense battery settings are rejected in the server action (`validateBattery`) and again by the DB CHECK constraints.
+- Nonsense battery settings are prevented in the form and rejected by the server action and the DB CHECK constraints (see below).
 
 ### Caveats
 
 - The price is Elexon's Market Index Price (`APXMIDP`), a spot index used as a proxy. It is not the N2EX day-ahead auction price a trader would actually commit at.
 - Most GB battery revenue comes from the Balancing Mechanism and frequency services. This app covers wholesale arbitrage only.
 - The demo uses a shared database with no auth, so anyone with the URL can add batteries and plans. Auth was out of scope.
+
+### Frequency response (Dynamic Containment)
+
+`lib/frequency.ts` stacks DC on top of arbitrage. DC auction results for day D clear on D‑1, so they are known when planning.
+
+- Committing an EFA block means offering the full MW to both DC High and DC Low for the whole block. Revenue = MW × block hours × (DCH + DCL), using each block's real length, so the 3 h and 5 h blocks on clock-change days are paid correctly.
+- Committed periods do no wholesale trading. SoC on entry to the block must leave 15 minutes of full-power delivery in each direction.
+- Blocks are chosen greedily: add the block that most increases wholesale + DC P&L while keeping every committed block inside the SoC band, and stop when nothing improves. Only paid blocks are considered.
+- On the seeded day (2026‑10‑14) this commits three blocks and lifts expected P&L from £8,913 (arbitrage only) to £13,796.
+- DC availability fees settle as planned. Realised P&L = wholesale volumes at actual prices + DC fees.
+- Limits: the arbitrage optimiser doesn't deliberately charge up to make DC feasible, so DC is committed only where the arbitrage plan leaves SoC inside the band. A block that covers period 1 is never feasible, because the day starts at min SoC. Energy delivered under DC and availability penalties are not modelled.
+
+## Prevent, then enforce
+
+The UI only offers valid choices, and the server re-checks everything as the backstop:
+
+- **Battery form:** validates live with the same `validateBattery` the server uses. Max SoC's minimum follows min SoC, like a return date that can't be earlier than the outbound date. The submit button stays disabled while anything is invalid, with the reason shown.
+- **Plan date:** capped at today. For a date with an approved or executed plan, generation is disabled and the page links to that plan.
+- **Mark executed:** disabled until the delivery day has fully settled.
+- **Server:** conditional UPDATEs, a draft-only upsert, and DB CHECK constraints. Each write is a single `db.batch` transaction, so a failure can't leave half a plan.
+- **E2E tests:** cover both layers. They strip the client-side guard, as a stale tab or hand-made request would, and check that the server still refuses.
 
 ## Data sources
 
@@ -115,11 +136,12 @@ npm run test:e2e   # Playwright (WebKit)
 
 - The unit tests cover idle on flat prices, power limits, efficiency losses, cycle cap, negative prices, missing prices, the 200-case property test, and 46/48/50-period days.
 - The e2e suite runs the full flow (create → generate → approve → execute), rejects a bad battery, checks that an approved plan can't be overwritten, and covers clock-change days.
-- By default the e2e suite targets the **production URL** and writes test batteries to the shared demo database. To point it at another deployment or a local server, set `E2E_BASE_URL`, e.g. `E2E_BASE_URL=http://localhost:3000 npm run test:e2e`.
+- By default the e2e suite targets the **production URL** and writes test batteries (named `E2E …`) to the shared demo database, so the demo's battery list grows with each run. To point it at another deployment or a local server, set `E2E_BASE_URL`, e.g. `E2E_BASE_URL=http://localhost:3000 npm run test:e2e`.
 
 ## What's next
 
-- **Frequency-response revenue stacking:** commit EFA blocks to Dynamic Containment using the NESO prices already cached, and plan arbitrage around the reserved headroom.
+- **Joint optimisation of DC and arbitrage:** charge up on purpose to make DC blocks feasible, and add Dynamic Moderation/Regulation and partial MW offers.
+- **Editing batteries:** plans already store a snapshot of the settings, so editing a battery would not change past plans.
 - **LP/MILP optimiser:** report the uplift over greedy, with a binary variable to prevent simultaneous charge and discharge.
 - **A better forecast** than D‑1 persistence.
 - **Balancing Mechanism:** needs a bid/offer strategy and acceptance modelling. It can't be planned like a fixed schedule.
