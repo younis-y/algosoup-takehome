@@ -8,6 +8,7 @@ import { getPrices } from "@/lib/elexon";
 import { planWithFrequency, type DcBlock } from "@/lib/frequency";
 import { getDcPrices } from "@/lib/neso";
 import { settle, validateBattery, type BatterySpec } from "@/lib/optimise";
+import { londonToday } from "@/lib/format";
 import { expectedPeriods, previousDay } from "@/lib/periods";
 
 export type FormState = { error?: string } | undefined;
@@ -32,6 +33,8 @@ export async function generatePlan(_: FormState, f: FormData): Promise<FormState
   const batteryId = num(f, "batteryId");
   const deliveryDate = f.get("deliveryDate");
   if (!isDate(deliveryDate)) return { error: "Pick a delivery date" };
+  if (deliveryDate > londonToday()) return { error: "Plans can be made up to today; the forecast needs the previous day's prices" };
+  if (!Number.isInteger(batteryId)) return { error: "Battery not found" };
   const b = await db.query.battery.findFirst({ where: eq(battery.id, batteryId) });
   if (!b) return { error: "Battery not found" };
 
@@ -98,6 +101,7 @@ export async function generatePlan(_: FormState, f: FormData): Promise<FormState
 
 export async function approvePlan(_: FormState, f: FormData): Promise<FormState> {
   const id = num(f, "planId");
+  if (!Number.isInteger(id)) return { error: "Plan not found" };
   const [row] = await db.update(dispatchPlan).set({ status: "approved", approvedAt: new Date() })
     .where(and(eq(dispatchPlan.id, id), eq(dispatchPlan.status, "draft")))
     .returning({ id: dispatchPlan.id });
@@ -107,6 +111,7 @@ export async function approvePlan(_: FormState, f: FormData): Promise<FormState>
 
 export async function executePlan(_: FormState, f: FormData): Promise<FormState> {
   const id = num(f, "planId");
+  if (!Number.isInteger(id)) return { error: "Plan not found" };
   const plan = await db.query.dispatchPlan.findFirst({ where: eq(dispatchPlan.id, id) });
   if (!plan) return { error: "Plan not found" };
   if (plan.status !== "approved") return { error: "Only an approved plan can be executed" };
