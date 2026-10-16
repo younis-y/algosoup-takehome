@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { battery, db, dispatchPlan, planInterval } from "@/db";
 import { getPrices } from "@/lib/elexon";
 import { planWithFrequency, type DcBlock } from "@/lib/frequency";
+import { optimiseLp } from "@/lib/lp";
 import { getDcPrices } from "@/lib/neso";
 import { settle, validateBattery, type BatterySpec } from "@/lib/optimise";
 import { STAGE, londonToday, niceDate } from "@/lib/format";
@@ -61,10 +62,12 @@ export async function generatePlan(_: FormState, f: FormData): Promise<FormState
     if (r.product === "DCH") k.dch = r.priceGbpMwH; else k.dcl = r.priceGbpMwH;
     blocks.set(r.deliveryStart, k);
   }
-  const plan = planWithFrequency(spec, deliveryDate, slots, [...blocks.values()]);
+  // Plan with the LP (best possible under the model); keep the greedy result to show the uplift.
+  const plan = planWithFrequency(spec, deliveryDate, slots, [...blocks.values()], optimiseLp);
+  const greedy = planWithFrequency(spec, deliveryDate, slots, [...blocks.values()]);
   const pnlBreakdown = {
     arbitrage: plan.arbitragePnl, frequency: plan.frequencyPnl, arbitrageOnly: plan.arbitrageOnlyPnl,
-    committed: plan.committed,
+    committed: plan.committed, greedy: greedy.expectedPnl,
   };
 
   // One transaction: upsert the plan (only over a draft) and replace its intervals.

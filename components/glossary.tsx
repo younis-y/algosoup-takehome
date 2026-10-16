@@ -15,6 +15,7 @@ export const TERMS: Record<string, { name: string; means: string }> = {
   EFA: { name: "EFA block", means: "Standby jobs are sold in 4-hour blocks, starting at 23:00. (EFA = Electricity Forward Agreement, an old industry calendar.)" },
   NESO: { name: "National Energy System Operator", means: "The organisation that keeps Great Britain's electricity grid balanced. It buys standby jobs like DC." },
   Elexon: { name: "Elexon", means: "The organisation that settles Great Britain's electricity market. Our half-hourly prices come from its free data service." },
+  LP: { name: "linear programming", means: "A maths method that checks every possible plan at once and finds the one that makes the most money while obeying all the battery's limits." },
   Draft: { name: "plan stages", means: "Draft: made, can still be changed. Approved: locked in. Done: the day is over and we've checked the real money." },
 };
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { checkPlan, optimise, type BatterySpec, type Interval } from "./optimise";
 import { blockRevenue, dcBand, planWithFrequency, type DcBlock } from "./frequency";
+import { optimiseLp } from "./lp";
 import { expectedPeriods, periodStartUtc } from "./periods";
 
 const demo: BatterySpec = { capacityMwh: 100, powerMw: 50, rte: 0.88, minSoc: 0.1, maxSoc: 0.9, maxCyclesPerDay: 1.5 };
@@ -29,7 +30,6 @@ function randomPrices(n: number, seed: number) {
 
 const asIdle = (ivs: Interval[]) => ivs.map((i) => (i.action === "reserve" ? { ...i, action: "idle" as const } : i));
 
-// SoC entering each committed block (SoC after the period before it; minE at period 1).
 // SoC entering each committed block: SoC after the period before its first period (minE at period 1).
 function entrySocs(b: BatterySpec, date: string, plan: ReturnType<typeof planWithFrequency>) {
   return plan.committed.map((k) => {
@@ -100,6 +100,22 @@ describe("planWithFrequency", () => {
       commitments += plan.committed.length;
     }
     expect(commitments).toBeGreaterThan(0); // the property checks above are not vacuous
+  });
+
+  it("keeps the same guarantees when the LP plans around the blocks", () => {
+    const band = dcBand(demo);
+    let commitments = 0;
+    for (let seed = 1; seed <= 20; seed++) {
+      const plan = planWithFrequency(demo, DATE, slots(randomPrices(48, seed)), efa(8, 6), optimiseLp);
+      for (const e of entrySocs(demo, DATE, plan)) {
+        expect(e).toBeGreaterThanOrEqual(band.lo - 1e-6);
+        expect(e).toBeLessThanOrEqual(band.hi + 1e-6);
+      }
+      expect(plan.expectedPnl).toBeGreaterThanOrEqual(plan.arbitrageOnlyPnl - 1e-6);
+      expect(checkPlan(demo, asIdle(plan.intervals))).toEqual([]);
+      commitments += plan.committed.length;
+    }
+    expect(commitments).toBeGreaterThan(0);
   });
 
   it("commits nothing when the battery is too small for a DC band", () => {

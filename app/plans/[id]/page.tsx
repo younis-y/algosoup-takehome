@@ -31,7 +31,7 @@ export default async function PlanPage({ params }: PageProps<"/plans/[id]">) {
   const drawn = traded.reduce((a, i) => a + (i.action === "discharge" ? i.mwh / s : 0), 0);
   const cycles = drawn / ((spec.maxSoc - spec.minSoc) * spec.capacityMwh);
   const executed = plan.status === "executed";
-  const mix = plan.pnlBreakdown as { arbitrage: number; frequency: number; arbitrageOnly: number; committed: DcBlock[] } | null;
+  const mix = plan.pnlBreakdown as { arbitrage: number; frequency: number; arbitrageOnly: number; committed: DcBlock[]; greedy?: number } | null;
   const hours = intervals.length / 2;
   const clockNote = intervals.length === 46 ? " (the clocks went forward, so this day is only 23 hours)" : intervals.length === 50 ? " (the clocks went back, so this day has 25 hours)" : "";
   const time = (period: number) => periodTime(plan.deliveryDate, period);
@@ -90,6 +90,14 @@ export default async function PlanPage({ params }: PageProps<"/plans/[id]">) {
           {executed && <p className="text-xs text-muted-foreground">Real money minus expected money. Below zero means the guess was too hopeful.</p>}
         </CardHeader></Card>
       </div>
+
+      {mix?.greedy != null && (
+        <p className="text-sm text-muted-foreground" data-testid="lp-uplift">
+          🧮 This plan was worked out with <Abbr term="LP">linear programming</Abbr>, which checks every possible plan and finds the best one.
+          {" "}A simpler &quot;cheapest first&quot; rule would have expected {gbp(mix.greedy)}, so the maths finds{" "}
+          <b>{gbp(plan.expectedPnl - mix.greedy)} more</b>{plan.expectedPnl - mix.greedy < 1 ? " (the simple rule was already as good here)" : ""}.
+        </p>
+      )}
 
       <Card>
         <CardHeader>

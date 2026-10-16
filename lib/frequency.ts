@@ -16,7 +16,7 @@
 //   no addition helps. With 6 blocks that's at most 1 + 6 + 5 + … + 1 = 22 optimise runs.
 // - Not modelled: energy actually delivered under DC, availability penalties, partial offers.
 
-import { optimise, type BatterySpec, type Interval, type Slot } from "./optimise";
+import { optimise, type BatterySpec, type Interval, type Plan, type Slot } from "./optimise";
 import { periodStartUtc } from "./periods";
 
 export type DcBlock = { start: string; end: string; dch: number; dcl: number }; // £/MW/h, ISO UTC
@@ -38,7 +38,10 @@ export function dcBand(b: BatterySpec) {
   return { lo: b.minSoc * b.capacityMwh + quarterHour / s, hi: b.maxSoc * b.capacityMwh - quarterHour * s };
 }
 
-export function planWithFrequency(b: BatterySpec, date: string, slots: Slot[], blocks: DcBlock[]): FrequencyPlan {
+// `solve` is the arbitrage optimiser to plan around the blocks: greedy by default, or the LP.
+export function planWithFrequency(
+  b: BatterySpec, date: string, slots: Slot[], blocks: DcBlock[], solve: (b: BatterySpec, slots: Slot[]) => Plan = optimise,
+): FrequencyPlan {
   const minE = b.minSoc * b.capacityMwh;
   const band = dcBand(b);
   const starts = slots.map((s) => ms(periodStartUtc(date, s.period)));
@@ -47,7 +50,7 @@ export function planWithFrequency(b: BatterySpec, date: string, slots: Slot[], b
 
   const evaluate = (chosen: number[]) => {
     const reserved = new Set(chosen.flatMap((j) => members[j]));
-    const plan = optimise(b, slots.map((s, i) => (reserved.has(i) ? { ...s, price: null } : s)));
+    const plan = solve(b, slots.map((s, i) => (reserved.has(i) ? { ...s, price: null } : s)));
     const inBand = chosen.every((j) => {
       const first = members[j][0];
       const e = first === 0 ? minE : plan.intervals[first - 1].socAfterMwh;
