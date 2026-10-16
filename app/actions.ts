@@ -128,6 +128,7 @@ export async function executePlan(_: FormState, f: FormData): Promise<FormState>
   const frequency = (plan.pnlBreakdown as { frequency?: number } | null)?.frequency ?? 0;
 
   // One transaction: flip status (only if still approved) and write actual prices together.
+  // If a concurrent request won the flip, these price writes repeat the same settled prices: harmless.
   const [flipped] = await db.batch([
     db.update(dispatchPlan).set({ status: "executed", executedAt: new Date(), realisedPnl: realised + frequency })
       .where(and(eq(dispatchPlan.id, id), eq(dispatchPlan.status, "approved")))
